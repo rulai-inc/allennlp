@@ -1,0 +1,8 @@
+version: '2'
+
+services:
+  allennlp:
+    image: ${DOCKER_REGISTRY}/allennlp:${ALLENNLP_SRL_VERSION}
+    restart: always
+    ports:
+    - "8080:8080"

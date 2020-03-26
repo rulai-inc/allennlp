@@ -1,0 +1,6 @@
+---
+server_port: 8080
+server_pool_size: -1
+
+batch_size: 128
+
