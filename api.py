@@ -18,7 +18,11 @@ logger = logging.getLogger(__name__)
 conf = load_config()
 app = FastAPI()
 
-srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz", cuda_device=torch.cuda.current_device())
+if torch.cuda.is_available():
+    srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz", cuda_device=torch.cuda.current_device())
+else:
+    srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz")
+
 # A hack for making the labeller use white space tokenizer
 # Assume the text is already tokenized
 srl_predictor._tokenizer.spacy.tokenizer = WhitespaceTokenizer(srl_predictor._tokenizer.spacy.vocab)
