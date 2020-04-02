@@ -20,15 +20,16 @@ app = FastAPI()
 
 if torch.cuda.is_available():
     srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz", cuda_device=torch.cuda.current_device())
+    batch_size = conf['batch_size']
 else:
     srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz")
+    batch_size = 8
 
 # A hack for making the labeller use white space tokenizer
 # Assume the text is already tokenized
 srl_predictor._tokenizer.spacy.tokenizer = WhitespaceTokenizer(srl_predictor._tokenizer.spacy.vocab)
 sent_tokenizer = SpacySentenceSplitter()
 
-batch_size = conf['batch_size']
 empty_text_res = {
     'verbs': [],
     'words': ''
