@@ -26,7 +26,7 @@ if cuda_available:
     batch_size = conf['batch_size']
 else:
     srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz")
-    num_threads = 4
+    num_threads = conf['server_pool_size']
 
 # A hack for making the labeller use white space tokenizer
 # Assume the text is already tokenized
