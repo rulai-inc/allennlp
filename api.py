@@ -88,7 +88,7 @@ async def srl_parse_session(data: dict):
 
     res_list = []
     start = 0
-    if cuda_available:
+    if cuda_available or num_threads <= 1:
         while start < len(sent_list):
             end = min(start + batch_size, len(sent_list))
             jsons = [{"sentence": sent} for sent in sent_list[start:end]]
