@@ -5,6 +5,7 @@ import pdb
 from fastapi import FastAPI
 import logging
 import torch
+from multiprocessing.pool import ThreadPool
 
 from allennlp.predictors import Predictor
 from allennlp.models.archival import load_archive
@@ -17,13 +18,15 @@ from config import load_config, setup_logging
 logger = logging.getLogger(__name__)
 conf = load_config()
 app = FastAPI()
+#cuda_available = torch.cuda.is_available()
+cuda_available = False
 
-if torch.cuda.is_available():
+if cuda_available:
     srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz", cuda_device=torch.cuda.current_device())
     batch_size = conf['batch_size']
 else:
     srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz")
-    batch_size = 8
+    num_threads = 8
 
 # A hack for making the labeller use white space tokenizer
 # Assume the text is already tokenized
@@ -54,6 +57,25 @@ async def srl_parse(data: dict):
     return res
 
 
+def parse_history_single(session):
+    new_history = []
+
+    docs = srl_predictor.predict_batch_json(session)
+    res = [gen_res(doc) for doc in docs]
+
+    return res
+
+    
+def parse_history_batch(session_batch):
+    session_idx, session_data = session_batch
+
+    result_session_list = []
+    for x, session in enumerate(session_data):
+        result_session_list.append(parse_history_single(session))
+
+    return result_session_list
+
+
 @app.post('/srl_parse_session')
 async def srl_parse_session(data: dict):
     text_list = data['session']
@@ -77,13 +99,22 @@ async def srl_parse_session(data: dict):
 
     res_list = []
     start = 0
-    while start < len(sent_list):
-        end = min(start + batch_size, len(sent_list))
-        jsons = [{"sentence": sent} for sent in sent_list[start:end]]
-        docs = srl_predictor.predict_batch_json(jsons)
-        res = [gen_res(doc) for doc in docs]
-        res_list.extend(res)
-        start += batch_size
+    if cuda_available:
+        while start < len(sent_list):
+            end = min(start + batch_size, len(sent_list))
+            jsons = [{"sentence": sent} for sent in sent_list[start:end]]
+            docs = srl_predictor.predict_batch_json(jsons)
+            res = [gen_res(doc) for doc in docs]
+            res_list.extend(res)
+            start += batch_size
+    else:
+        jsons = [{"sentence": sent} for sent in sent_list]
+        batch_size = len(jsons) / num_threads
+        if len(jsons) % num_threads > 0:
+            batch_size += 1
+        data_list_list = [(i, sent_list[i:i + batch_size]) for i in range(0, len(sent_list), batch_size)]
+        pool = ThreadPool(min(num_threads, len(data_list_list)))
+        results = pool.map(parse_history_batch, data_list_list, chunksize=1)
 
     # insert empty results for empty text
     full_res_list = [empty_text_res for x in range(full_number)]
