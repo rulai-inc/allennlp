@@ -57,25 +57,14 @@ async def srl_parse(data: dict):
     return res
 
 
-def parse_history_single(session):
-    new_history = []
-
-    docs = srl_predictor.predict_batch_json(session)
+def parse_history_batch(session_batch):
+    session_idx, session_data = session_batch
+    docs = srl_predictor.predict_batch_json(session_data)
     res = [gen_res(doc) for doc in docs]
 
     return res
 
     
-def parse_history_batch(session_batch):
-    session_idx, session_data = session_batch
-
-    result_session_list = []
-    for x, session in enumerate(session_data):
-        result_session_list.append(parse_history_single(session))
-
-    return result_session_list
-
-
 @app.post('/srl_parse_session')
 async def srl_parse_session(data: dict):
     text_list = data['session']
@@ -109,12 +98,13 @@ async def srl_parse_session(data: dict):
             start += batch_size
     else:
         jsons = [{"sentence": sent} for sent in sent_list]
-        batch_size = len(jsons) / num_threads
+        batch_size = len(jsons) // num_threads
         if len(jsons) % num_threads > 0:
             batch_size += 1
-        data_list_list = [(i, sent_list[i:i + batch_size]) for i in range(0, len(sent_list), batch_size)]
+        data_list_list = [(i, jsons[i:i + batch_size]) for i in range(0, len(jsons), batch_size)]
         pool = ThreadPool(min(num_threads, len(data_list_list)))
         results = pool.map(parse_history_batch, data_list_list, chunksize=1)
+        res_list = sum(results, [])
 
     # insert empty results for empty text
     full_res_list = [empty_text_res for x in range(full_number)]
