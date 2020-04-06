@@ -18,15 +18,15 @@ from config import load_config, setup_logging
 logger = logging.getLogger(__name__)
 conf = load_config()
 app = FastAPI()
-#cuda_available = torch.cuda.is_available()
-cuda_available = False
+cuda_available = torch.cuda.is_available()
+#cuda_available = False
 
 if cuda_available:
     srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz", cuda_device=torch.cuda.current_device())
     batch_size = conf['batch_size']
 else:
     srl_predictor = Predictor.from_path("https://s3-us-west-2.amazonaws.com/allennlp/models/srl-model-2018.05.25.tar.gz")
-    num_threads = 8
+    num_threads = 4
 
 # A hack for making the labeller use white space tokenizer
 # Assume the text is already tokenized
