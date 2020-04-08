@@ -88,7 +88,7 @@ async def srl_parse_session(data: dict):
 
     res_list = []
     start = 0
-    if cuda_available or num_threads <= 1:
+    if cuda_available:
         while start < len(sent_list):
             end = min(start + batch_size, len(sent_list))
             jsons = [{"sentence": sent} for sent in sent_list[start:end]]
@@ -98,13 +98,17 @@ async def srl_parse_session(data: dict):
             start += batch_size
     else:
         jsons = [{"sentence": sent} for sent in sent_list]
-        batch_size = len(jsons) // num_threads
-        if len(jsons) % num_threads > 0:
-            batch_size += 1
-        data_list_list = [(i, jsons[i:i + batch_size]) for i in range(0, len(jsons), batch_size)]
-        pool = ThreadPool(min(num_threads, len(data_list_list)))
-        results = pool.map(parse_history_batch, data_list_list, chunksize=1)
-        res_list = sum(results, [])
+        if num_threads > 1:
+            batch_size = len(jsons) // num_threads
+            if len(jsons) % num_threads > 0:
+                batch_size += 1
+            data_list_list = [(i, jsons[i:i + batch_size]) for i in range(0, len(jsons), batch_size)]
+            pool = ThreadPool(min(num_threads, len(data_list_list)))
+            results = pool.map(parse_history_batch, data_list_list, chunksize=1)
+            res_list = sum(results, [])
+        else:
+            results = srl_predictor.predict_batch_json(jsons)
+            res_list = [gen_res(doc) for doc in results]
 
     # insert empty results for empty text
     full_res_list = [empty_text_res for x in range(full_number)]
@@ -134,4 +138,4 @@ async def srl_parse_session(data: dict):
 
 if __name__ == "__main__":
     #setup_logging()
-    uvicorn.run(app, host="0.0.0.0", port=conf["server_port"])
+    uvicorn.run(app, host="127.0.0.1", port=conf["server_port"])
